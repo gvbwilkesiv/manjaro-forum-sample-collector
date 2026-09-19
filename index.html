@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manjaro Forum Sample Collector</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#202124;background:#fff}
+body{max-width:1120px;margin:38px auto;padding:0 22px;line-height:1.45}
+h1{margin-bottom:.25rem} h2{margin-top:0;font-size:1.18rem;letter-spacing:.02em}
+.lede{max-width:850px;color:#4b4f52}.stage{border:1px solid #d9dde1;border-radius:8px;padding:22px;margin:24px 0;background:#fff}.stage-number{font-size:.78rem;font-weight:700;color:#5f6368;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}.instruction{max-width:900px}.between{border-left:4px solid #dadce0;padding:3px 0 3px 16px;margin:18px 2px;color:#4b4f52}.controls{display:flex;gap:9px;align-items:end;flex-wrap:wrap;margin-top:16px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:.85rem;font-weight:600}.field input{padding:9px 10px;min-width:250px;border:1px solid #b8bdc2;border-radius:4px;font:inherit}button{padding:10px 16px;cursor:pointer;border:1px solid #9aa0a6;border-radius:4px;background:#f8f9fa;font-weight:600}button.primary{background:#202124;color:#fff;border-color:#202124}button:disabled{opacity:.48;cursor:not-allowed}.status{white-space:pre-wrap;padding:12px;background:#f1f3f4;margin:16px 0 0;border-radius:4px}.result{margin-top:18px}.meta{font-size:13px;color:#5f6368}.facts{display:flex;gap:18px;flex-wrap:wrap;font-size:14px}.wrap{overflow:auto;max-height:560px;border:1px solid #e0e0e0}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid #e0e0e0;border-right:1px solid #eee;padding:7px;text-align:left;vertical-align:top}th{background:#fafafa;position:sticky;top:0;z-index:1}a{color:#185abc}.footer-note{font-size:13px;color:#5f6368;margin:28px 0}
+</style>
+</head>
+<body>
+<h1>Manjaro Forum Sample Collector</h1>
+<p class="lede">This tool supports a two-stage research procedure. It acquires forum topic data only. You perform the sorting, coding, classification, analysis, interpretation, and recommendation.</p>
+
+<section class="stage" aria-labelledby="general-title">
+<div class="stage-number">Stage 1</div>
+<h2 id="general-title">DRAW GENERAL SAMPLE</h2>
+<p class="instruction">Collect 100 topics from <strong>Manjaro Support → Third-Party Software</strong>. Download the CSV and analyze the sample to identify a named software or device entity that warrants further investigation.</p>
+<div class="controls">
+<button class="primary" id="collect-general">Collect Sample 1</button>
+<button id="download-general" disabled>Download Sample 1 CSV</button>
+</div>
+<p class="status" id="status-general">Ready.</p>
+<div class="result" id="result-general" hidden>
+<div class="facts"><span><strong>Source:</strong> <span id="source-general"></span></span><span><strong>Topics:</strong> <span id="count-general"></span></span><span><strong>Collected:</strong> <span id="when-general"></span></span></div>
+<p class="meta">Topic titles link to the original Manjaro discussions. Pinned administrative topics are excluded. The CSV preserves source URLs and collection provenance.</p>
+<div class="wrap"><table><thead><tr><th>#</th><th>Topic</th><th>Replies</th><th>Views</th><th>Activity</th><th>Tags</th><th>Topic ID</th></tr></thead><tbody id="body-general"></tbody></table></div>
+</div>
+</section>
+
+<div class="between"><strong>Between Stage 1 and Stage 2:</strong> analyze Sample 1 yourself. Identify the named entity your evidence indicates deserves closer investigation, then determine the corresponding Manjaro tag. The collector does not make this decision for you.</div>
+
+<section class="stage" aria-labelledby="tag-title">
+<div class="stage-number">Stage 2</div>
+<h2 id="tag-title">DRAW NAMED-ENTITY SAMPLE</h2>
+<p class="instruction">Enter the <strong>Manjaro tag</strong> corresponding to the named entity identified through your analysis of Sample 1. The collector will retrieve up to 100 topics carrying that tag from across the Manjaro forum. If fewer than 100 are available, it will return the available topics.</p>
+<div class="controls">
+<div class="field"><label for="tag-input">Manjaro tag</label><input id="tag-input" type="text" placeholder="e.g., wine" autocomplete="off" spellcheck="false"></div>
+<button class="primary" id="collect-tag">Collect Sample 2</button>
+<button id="download-tag" disabled>Download Sample 2 CSV</button>
+</div>
+<p class="status" id="status-tag">Ready. Enter a Manjaro tag after completing your Sample 1 analysis.</p>
+<div class="result" id="result-tag" hidden>
+<div class="facts"><span><strong>Source:</strong> <span id="source-tag"></span></span><span><strong>Topics:</strong> <span id="count-tag"></span></span><span><strong>Collected:</strong> <span id="when-tag"></span></span></div>
+<p class="meta">Sample 2 is tag-bounded across the Manjaro forum rather than restricted to Third-Party Software. Topic titles link to their original discussions.</p>
+<div class="wrap"><table><thead><tr><th>#</th><th>Topic</th><th>Replies</th><th>Views</th><th>Activity</th><th>Tags</th><th>Topic ID</th></tr></thead><tbody id="body-tag"></tbody></table></div>
+</div>
+</section>
+
+<p class="footer-note">Acquisition only: no sorting, coding, classification, ranking, or interpretation is performed by this application.</p>
+
+<script>
+const WORKER = "https://manjaro-sample-collector.gwilkes.workers.dev";
+let generalPayload = null;
+let tagPayload = null;
+
+function tagNames(tags){if(!Array.isArray(tags))return "";return tags.map(t=>typeof t==="string"?t:(t?.name??t?.slug??"")).filter(Boolean).join("; ")}
+function csvCell(value){return '"'+String(value??"").replaceAll('"','""')+'"'}
+function displayDate(value){if(!value)return "";const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleString()}
+function safeFilenamePart(value){return String(value??"tag").toLowerCase().replace(/[^a-z0-9._-]+/g,"-").replace(/^-+|-+$/g,"")||"tag"}
+
+function render(data, suffix){
+ document.querySelector(`#source-${suffix}`).textContent=data.source??"";
+ document.querySelector(`#count-${suffix}`).textContent=`${data.actual_sample_size??data.topics.length} / ${data.requested_sample_size??100}`;
+ document.querySelector(`#when-${suffix}`).textContent=displayDate(data.collected_at);
+ const tbody=document.querySelector(`#body-${suffix}`);tbody.innerHTML="";
+ for(const row of data.topics){
+  const tr=document.createElement("tr");
+  const number=document.createElement("td");number.textContent=row.sample_number??"";tr.appendChild(number);
+  const topic=document.createElement("td");
+  if(row.topic_url){const link=document.createElement("a");link.href=row.topic_url;link.target="_blank";link.rel="noopener noreferrer";link.textContent=row.topic??"";topic.appendChild(link)}else{topic.textContent=row.topic??""}tr.appendChild(topic);
+  [row.replies,row.views,displayDate(row.activity),tagNames(row.tags),row.topic_id].forEach(value=>{const td=document.createElement("td");td.textContent=value??"";tr.appendChild(td)});
+  tbody.appendChild(tr);
+ }
+ document.querySelector(`#result-${suffix}`).hidden=false;
+}
+
+async function collectGeneral(){
+ const status=document.querySelector("#status-general"),download=document.querySelector("#download-general");generalPayload=null;download.disabled=true;document.querySelector("#result-general").hidden=true;status.textContent="Collecting Sample 1…";
+ try{
+  const response=await fetch(WORKER,{headers:{Accept:"application/json"}});if(!response.ok)throw new Error(`Worker returned HTTP ${response.status}`);const data=await response.json();if(!Array.isArray(data.topics))throw new Error("Worker response contains no topics array.");
+  generalPayload=data;render(data,"general");status.textContent=`Success: collected ${data.topics.length} Manjaro topics for Sample 1. Pinned administrative topics are excluded. No sorting, coding, or analysis has been performed.`;download.disabled=data.topics.length===0;
+ }catch(error){status.textContent="Collection failed.\n\n"+error.message+"\n\nPlease report this message to your instructor."}
+}
+
+async function collectTag(){
+ const input=document.querySelector("#tag-input"),status=document.querySelector("#status-tag"),download=document.querySelector("#download-tag");const tag=input.value.trim().toLowerCase();tagPayload=null;download.disabled=true;document.querySelector("#result-tag").hidden=true;
+ if(!tag){status.textContent="Enter the Manjaro tag identified through your Sample 1 analysis.";input.focus();return}
+ status.textContent=`Collecting Sample 2 for tag “${tag}”…`;
+ try{
+  const url=`${WORKER}/?mode=tag&tag=${encodeURIComponent(tag)}`;const response=await fetch(url,{headers:{Accept:"application/json"}});const data=await response.json();if(!response.ok)throw new Error(data?.detail??data?.error??`Worker returned HTTP ${response.status}`);if(!Array.isArray(data.topics))throw new Error("Worker response contains no topics array.");
+  tagPayload=data;render(data,"tag");const n=data.topics.length;status.textContent=`Success: collected ${n} Manjaro topic${n===1?"":"s"} for tag “${data.tag??tag}”. ${n<100?"Fewer than 100 eligible topics were available for this tag. ":""}No sorting, coding, or analysis has been performed.`;download.disabled=n===0;
+ }catch(error){status.textContent="Collection failed.\n\n"+error.message+"\n\nCheck the Manjaro tag and try again. If the problem persists, report this message to your instructor."}
+}
+
+function downloadCSV(payload,filename){
+ if(!payload?.topics?.length)return;
+ const header=["sample_number","topic","replies","views","activity","tags","topic_id","topic_url","collection_timestamp","source"];
+ const lines=[header.map(csvCell).join(",")];
+ for(const row of payload.topics){lines.push([row.sample_number,row.topic,row.replies,row.views,row.activity??"",tagNames(row.tags),row.topic_id,row.topic_url??"",payload.collected_at??"",payload.source??""].map(csvCell).join(","))}
+ const blob=new Blob(["\uFEFF"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");const objectUrl=URL.createObjectURL(blob);a.href=objectUrl;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000)
+}
+
+document.querySelector("#collect-general").addEventListener("click",collectGeneral);
+document.querySelector("#download-general").addEventListener("click",()=>downloadCSV(generalPayload,"manjaro-third-party-software-sample.csv"));
+document.querySelector("#collect-tag").addEventListener("click",collectTag);
+document.querySelector("#download-tag").addEventListener("click",()=>downloadCSV(tagPayload,`manjaro-tag-${safeFilenamePart(tagPayload?.tag)}-sample.csv`));
+document.querySelector("#tag-input").addEventListener("keydown",event=>{if(event.key==="Enter")collectTag()});
+</script>
+</body>
+</html>
